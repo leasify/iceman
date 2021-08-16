@@ -30,19 +30,72 @@ class Pull extends Command
     {
         $environment = $this->argument('environment');
         $host = $this->matchHost($environment);
+        $db = $this->matchDatabase($environment);
+        $path = $this->matchPath($environment);
+        $localDB = env("DB_DATABASE");
 
-        if (!$environment || !$host) {
-            $this->error("<error>Environment `{$environment}` not possible to translate to a valid host.</error>");
+        if (!$environment) {
+            $this->error("<error>Environment name missing, eg 'prod'.</error>");
             return;
         }
 
-        echo $host . "\n";
+        if (!$host) {
+            $this->error("<error>Can´t resolve a valid host from environment `{$environment}`.</error>");
+            return;
+        }
+
+        if (!$db) {
+            $this->error("<error>Can´t resolve a valid database from environment `{$environment}`.</error>");
+            return;
+        }
+
+        if (!$path) {
+            $this->error("<error>Can´t resolve a valid path from environment `{$environment}`.</error>");
+            return;
+        }
+
+        $actions = [
+            "ssh {$host} -o \"StrictHostKeyChecking no\" 'sudo -i -u postgres /usr/bin/pg_dump {$db} | gzip' > db.sql.gz",
+            "gzip -df db.sql.gz",
+            "php artisan db:wipe --drop-types",
+            "cat db.sql | psql {$localDB}",
+            "rm db.sql",
+        ];
+
+        if($db == 'production') {
+            $actions[] = "psql -d {$localDB} -c \"UPDATE users SET email=concat(email,'.cc');\"";
+        }
+
+        $actions[] = "php artisan cache:clear";
+        $actions[] = "rsync -av {$host}:{$path}/shared/public/logos public";
+
+        foreach ($actions as $action) {
+            $this->info($action);
+            $result = shell_exec($action);
+            $this->info($result);
+        }
     }
 
     public function matchHost($environment) : string {
         $result = "";
         if($environment == "prod" || $environment == "production") {
-            $result = "c2698.cloudnet.cloud";
+            $result = "root@c2698.cloudnet.cloud";
+        }
+        return $result;
+    }
+
+    public function matchDatabase($environment) : string {
+        $result = "";
+        if($environment == "prod" || $environment == "production") {
+            $result = "production";
+        }
+        return $result;
+    }
+
+    public function matchPath($environment) : string {
+        $result = "";
+        if($environment == "prod" || $environment == "production") {
+            $result = "/mnt/persist/www/docroot_production";
         }
         return $result;
     }
