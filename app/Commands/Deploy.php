@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use Dotenv\Dotenv;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Collection;
 use LaravelZero\Framework\Commands\Command;
@@ -35,6 +36,9 @@ class Deploy extends Command
         $siteId = 0;
         $shortUnique = "AP" . uniqid();
 
+        $dotenv = Dotenv::createImmutable(__DIR__);
+        $dotenv->load();
+
         /*
         * --feature flag required to get the full git branch
         */
@@ -54,7 +58,7 @@ class Deploy extends Command
         * Get env FORGE_API key installed for the API
         */
         $this->info("<info>Logging in to Laravel Forge</info>");
-        $apiKey = getenv("FORGE_API");
+        $apiKey = env("FORGE_API");
 
         if(!$apiKey) {
             $this->error("Environment key FORGE_API is missing");

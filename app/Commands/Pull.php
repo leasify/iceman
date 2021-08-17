@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use Dotenv\Dotenv;
 use Illuminate\Console\Scheduling\Schedule;
 use LaravelZero\Framework\Commands\Command;
 
@@ -28,6 +29,9 @@ class Pull extends Command
      */
     public function handle()
     {
+        $dotenv = Dotenv::createImmutable(__DIR__);
+        $dotenv->load();
+
         $environment = $this->argument('environment');
         $host = $this->matchHost($environment);
         $db = $this->matchDatabase($environment);
