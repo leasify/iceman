@@ -2,7 +2,7 @@
 
 namespace App\Commands;
 
-use Dotenv\Dotenv;
+use App\Helpers\Environment;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Collection;
 use LaravelZero\Framework\Commands\Command;
@@ -36,8 +36,7 @@ class Deploy extends Command
         $siteId = 0;
         $shortUnique = "AP" . uniqid();
 
-        $dotenv = Dotenv::createImmutable(__DIR__);
-        $dotenv->load();
+        Environment::make();
 
         /*
         * --feature flag required to get the full git branch
