@@ -29,7 +29,7 @@ class Pull extends Command
      */
     public function handle()
     {
-        $dotenv = Dotenv::createImmutable(__DIR__);
+        $dotenv = Dotenv::createImmutable(getcwd());
         $dotenv->load();
 
         $environment = $this->argument('environment');
