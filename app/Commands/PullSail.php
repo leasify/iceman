@@ -61,16 +61,16 @@ class PullSail extends Command
         $actions = [
             "ssh {$host} -o \"StrictHostKeyChecking no\" 'sudo -i -u postgres /usr/bin/pg_dump {$db} | gzip' > db.sql.gz",
             "gzip -df db.sql.gz",
-            "sail artisan db:wipe --drop-types",
+            "vendor/bin/sail artisan db:wipe --drop-types",
             "cat db.sql | docker exec -i leasifyse_pgsql_1 psql -U {$localDBUsername} {$localDB}",
             "rm db.sql",
         ];
 
         if($db == 'production') {
-            $actions[] = "sail psql -d {$localDB} -c \"UPDATE users SET email=concat(email,'.cc');\"";
+            $actions[] = "vendor/bin/sail psql -d {$localDB} -c \"UPDATE users SET email=concat(email,'.cc');\"";
         }
 
-        $actions[] = "sail artisan cache:clear";
+        $actions[] = "vendor/bin/sail artisan cache:clear";
         $actions[] = "rsync -av {$host}:{$path}/shared/public/logos public";
 
         foreach ($actions as $action) {
