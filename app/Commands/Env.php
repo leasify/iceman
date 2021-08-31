@@ -46,4 +46,28 @@ class Env extends Command
     {
         // $schedule->command(static::class)->everyMinute();
     }
+
+    public static function matchHost($environment) : string {
+        $result = "";
+        if($environment == "prod" || $environment == "production") {
+            $result = "root@c2698.cloudnet.cloud";
+        }
+        return $result;
+    }
+
+    public static function matchDatabase($environment) : string {
+        $result = "";
+        if($environment == "prod" || $environment == "production") {
+            $result = "production";
+        }
+        return $result;
+    }
+
+    public static function matchPath($environment) : string {
+        $result = "";
+        if($environment == "prod" || $environment == "production") {
+            $result = "/mnt/persist/www/docroot_production";
+        }
+        return $result;
+    }
 }

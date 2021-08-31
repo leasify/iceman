@@ -3,7 +3,6 @@
 namespace App\Commands;
 
 use App\Helpers\Environment;
-use Dotenv\Dotenv;
 use Illuminate\Console\Scheduling\Schedule;
 use LaravelZero\Framework\Commands\Command;
 
@@ -33,9 +32,9 @@ class Pull extends Command
         Environment::make();
 
         $environment = $this->argument('environment');
-        $host = $this->matchHost($environment);
-        $db = $this->matchDatabase($environment);
-        $path = $this->matchPath($environment);
+        $host = Env::matchHost($environment);
+        $db = Env::matchDatabase($environment);
+        $path = Env::matchPath($environment);
         $localDB = env("DB_DATABASE");
 
         if (!$environment) {
@@ -78,30 +77,6 @@ class Pull extends Command
             $result = shell_exec($action);
             $this->info($result);
         }
-    }
-
-    public function matchHost($environment) : string {
-        $result = "";
-        if($environment == "prod" || $environment == "production") {
-            $result = "root@c2698.cloudnet.cloud";
-        }
-        return $result;
-    }
-
-    public function matchDatabase($environment) : string {
-        $result = "";
-        if($environment == "prod" || $environment == "production") {
-            $result = "production";
-        }
-        return $result;
-    }
-
-    public function matchPath($environment) : string {
-        $result = "";
-        if($environment == "prod" || $environment == "production") {
-            $result = "/mnt/persist/www/docroot_production";
-        }
-        return $result;
     }
 
     /**
