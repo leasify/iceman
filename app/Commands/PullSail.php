@@ -67,7 +67,7 @@ class PullSail extends Command
         ];
 
         if($db == 'production') {
-            $actions[] = "vendor/bin/sail psql -d {$localDB} -c \"UPDATE users SET email=concat(email,'.cc');\"";
+            $actions[] = "docker exec -i leasifyse_pgsql_1 psql -U {$localDBUsername} -d {$localDB} -c \"UPDATE users SET email=concat(email,'.cc');\"";
         }
 
         $actions[] = "vendor/bin/sail artisan cache:clear";
