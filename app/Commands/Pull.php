@@ -70,7 +70,6 @@ class Pull extends Command
         }
 
         $actions[] = "php artisan cache:clear";
-        $actions[] = "rsync -av {$host}:{$path}/shared/public/logos public";
 
         foreach ($actions as $action) {
             $this->info($action);
