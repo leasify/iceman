@@ -19,3 +19,11 @@ You need to have your SSH-key installed at Cloudnet servers. Please contact them
 
 ## License
 Iceman is an open-source software licensed under the MIT license.
+
+## Upgrades
+* `php iceman app:build iceman` (set version number eg, 1.0.10)
+* `git add .`
+* `git commit -m 'upgrade'`
+* `git tag 1.0.10`
+* `git push --tags`
+* `composer global update`

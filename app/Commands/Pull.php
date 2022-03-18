@@ -59,15 +59,15 @@ class Pull extends Command
 
         $actions = [];
 
-        if($this->option('fresh') || !file_exists("{$localDB}-db.sql")) {
+        if($this->option('fresh') || !file_exists("/tmp/{$localDB}-db.sql.gz")) {
             $this->info("Fresh database fetch for this pull...");
             $actions[] = "ssh {$host} -o \"StrictHostKeyChecking no\" 'sudo -i -u postgres /usr/bin/pg_dump {$db} | gzip' > /tmp/{$localDB}-db.sql.gz";
         }
 
         $actions = array_merge($actions, [
-            "gzip -df {$localDB}-db.sql.gz",
+            "gzip -cdf /tmp/{$localDB}-db.sql.gz > db.sql",
             "php artisan db:wipe --drop-types",
-            "cat {$localDB}-db.sql | psql {$localDB}",
+            "cat db.sql | psql {$localDB}",
             "rm db.sql",
         ]);
 
