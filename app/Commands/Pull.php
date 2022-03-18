@@ -13,7 +13,7 @@ class Pull extends Command
      *
      * @var string
      */
-    protected $signature = 'pull {environment : Environment to fetch, eg prod}';
+    protected $signature = 'pull {environment : Environment to fetch, eg prod} {--fresh}';
 
     /**
      * The description of the command.
@@ -57,13 +57,19 @@ class Pull extends Command
             return;
         }
 
-        $actions = [
-            "ssh {$host} -o \"StrictHostKeyChecking no\" 'sudo -i -u postgres /usr/bin/pg_dump {$db} | gzip' > db.sql.gz",
-            "gzip -df db.sql.gz",
+        $actions = [];
+
+        if($this->option('fresh') || !file_exists("{$localDB}-db.sql")) {
+            $this->info("Fresh database fetch for this pull...");
+            $actions[] = "ssh {$host} -o \"StrictHostKeyChecking no\" 'sudo -i -u postgres /usr/bin/pg_dump {$db} | gzip' > /tmp/{$localDB}-db.sql.gz";
+        }
+
+        $actions = array_merge($actions, [
+            "gzip -df {$localDB}-db.sql.gz",
             "php artisan db:wipe --drop-types",
-            "cat db.sql | psql {$localDB}",
+            "cat {$localDB}-db.sql | psql {$localDB}",
             "rm db.sql",
-        ];
+        ]);
 
         if($db == 'production') {
             $actions[] = "psql -d {$localDB} -c \"UPDATE users SET email=concat(email,'.cc');\"";
