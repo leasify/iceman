@@ -14,12 +14,6 @@ Commands:
 Please ensure that the env key FORGE_API is set, eg:
 `export FORGE_API=eyJ0eXAiOiJK`
 
-## Cloudnet
-You need to have your SSH-key installed at Cloudnet servers. Please contact them at support@cloudnet.se to get access for your local environment.
-
-## License
-Iceman is an open-source software licensed under the MIT license.
-
 ## Upgrades
 * `php iceman app:build iceman` (set version number eg, 1.0.10)
 * `git add .`
@@ -27,3 +21,9 @@ Iceman is an open-source software licensed under the MIT license.
 * `git tag 1.0.10`
 * `git push --tags`
 * `composer global update`
+
+## Cloudnet
+You need to have your SSH-key installed at Cloudnet servers. Please contact them at support@cloudnet.se to get access for your local environment.
+
+## License
+Iceman is an open-source software licensed under the MIT license.
