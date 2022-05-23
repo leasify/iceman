@@ -9,6 +9,7 @@ Commands:
 * `feature {AP-branch}` creates a new Laravel Forge site in our AWS environment
 * `pull {environment}` eg, `iceman pull prod` gets the database and local files from the production environment at Cloudnet.
 * `pull:sail {environment}` eg, `iceman pull:sail prod` gets the database and local files from the production environment at Cloudnet to your Sail environment.
+* `db:update {environment}` eg, `iceman db:update dev3` gets the database from the production environment and updates dev3 database.
 
 ## FORGE API
 Please ensure that the env key FORGE_API is set, eg:
