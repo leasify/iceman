@@ -50,7 +50,7 @@ class Env extends Command
     public static function matchHost($environment) : string {
         $result = "";
         if($environment == "prod" || $environment == "production") {
-            $result = "forge@13.50.158.198";
+            $result = "forge@16.16.179.110";
         }
         if($environment == "develop") {
             $result = "forge@13.49.49.40";
