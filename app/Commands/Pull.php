@@ -61,7 +61,7 @@ class Pull extends Command
 
         if($this->option('fresh') || !file_exists("/tmp/{$localDB}-db.sql.gz")) {
             $this->info("Fresh database fetch for this pull...");
-            $actions[] = "ssh {$host} -o \"StrictHostKeyChecking no\" 'sudo -i -u postgres /usr/bin/pg_dump {$db} | gzip' > /tmp/{$localDB}-db.sql.gz";
+            $actions[] = "ssh {$host} -o \"StrictHostKeyChecking no\" 'sudo -i -u forge /usr/bin/pg_dump {$db} | gzip' > /tmp/{$localDB}-db.sql.gz";
         }
 
         $actions = array_merge($actions, [
