@@ -41,17 +41,17 @@ class DbUpdate extends Command
             return;
         }
 
-        if ($environment=="prod") {
+        if ($environment == "prod") {
             $this->error("<error>Don't ever run this on prod!</error>");
             return;
         }
 
-        if ($environment=="production") {
+        if ($environment == "production") {
             $this->error("<error>Don't ever run this on prod!</error>");
             return;
         }
 
-        if ($environment=="staging") {
+        if ($environment == "staging") {
             $this->error("<error>Staging updated every deployment to master, even db.</error>");
             return;
         }
@@ -62,6 +62,11 @@ class DbUpdate extends Command
         }
 
         if ($host == "forge@16.16.179.110") {
+            $this->error("<error>Nothing allowed on db prod.</error>");
+            return;
+        }
+
+        if (strpos($host, "16.16.179.110")) {
             $this->error("<error>Nothing allowed on db prod.</error>");
             return;
         }
