@@ -3,7 +3,6 @@
 namespace App\Commands;
 
 use App\Helpers\Environment;
-use Dotenv\Dotenv;
 use Illuminate\Console\Scheduling\Schedule;
 use LaravelZero\Framework\Commands\Command;
 
@@ -55,6 +54,15 @@ class Env extends Command
         if($environment == "develop") {
             $result = "forge@13.49.49.40";
         }
+        if($environment == "dev1") {
+            $result = "forge@13.49.49.40";
+        }
+        if($environment == "dev2") {
+            $result = "forge@13.49.49.40";
+        }
+        if($environment == "dev3") {
+            $result = "forge@13.49.49.40";
+        }
         return $result;
     }
 
@@ -66,6 +74,15 @@ class Env extends Command
         if($environment == "develop") {
             $result = "develop";
         }
+        if($environment == "dev1") {
+            $result = "dev1";
+        }
+        if($environment == "dev2") {
+            $result = "dev2";
+        }
+        if($environment == "dev3") {
+            $result = "dev3";
+        }
         return $result;
     }
 
@@ -76,6 +93,15 @@ class Env extends Command
         }
         if($environment == "develop") {
             $result = "/home/forge/develop.leasify.se";
+        }
+        if($environment == "dev1") {
+            $result = "/home/forge/dev1.leasify.se";
+        }
+        if($environment == "dev2") {
+            $result = "/home/forge/dev2.leasify.se";
+        }
+        if($environment == "dev3") {
+            $result = "/home/forge/dev3.leasify.se";
         }
         return $result;
     }
