@@ -92,7 +92,7 @@ class DbUpdate extends Command
             "ssh {$host} -o \"StrictHostKeyChecking no\" 'cat /tmp/db_{$db}.sql | sudo -i -u forge /usr/bin/psql {$db}'",
             "ssh {$host} -o \"StrictHostKeyChecking no\" 'rm -f /tmp/db_{$db}.sql'",
             "ssh {$host} -o \"StrictHostKeyChecking no\" \"{$replace}\"",
-            "ssh {$host} -o \"StrictHostKeyChecking no\" 'cd {$path}/current && php artisan migrate && php artisan optimize:clear'",
+            "ssh {$host} -o \"StrictHostKeyChecking no\" 'cd {$path} && php artisan migrate && php artisan optimize:clear'",
         ];
 
         foreach ($actions as $action) {
