@@ -61,6 +61,11 @@ class DbUpdate extends Command
             return;
         }
 
+        if ($host == "forge@16.16.179.110") {
+            $this->error("<error>Nothing allowed on db prod.</error>");
+            return;
+        }
+
         if (!$db) {
             $this->error("<error>Can´t resolve a valid database from environment `{$environment}`.</error>");
             return;
@@ -74,15 +79,15 @@ class DbUpdate extends Command
         $replace = 'sudo -i -u postgres /usr/bin/psql ' . $db . ' -c \"UPDATE users SET email=concat(email,\'.cc\');\"';
 
         $actions = [
-            "ssh deploy@c2698.cloudnet.cloud -o \"StrictHostKeyChecking no\" 'sudo -i -u forge /usr/bin/pg_dump production | gzip' > db_{$db}.sql.gz",
-            "scp db_{$db}.sql.gz root@c7669.cloudnet.cloud:/tmp/db_{$db}.sql.gz",
+            "ssh forge@16.16.179.110 -o \"StrictHostKeyChecking no\" 'sudo -i -u forge /usr/bin/pg_dump production | gzip' > db_{$db}.sql.gz",
+            "scp db_{$db}.sql.gz {$host}:/tmp/db_{$db}.sql.gz",
             "rm db_{$db}.sql.gz",
-            "ssh root@c7669.cloudnet.cloud -o \"StrictHostKeyChecking no\" 'gzip -df /tmp/db_{$db}.sql.gz'",
-            "ssh root@c7669.cloudnet.cloud -o \"StrictHostKeyChecking no\" 'cd {$path}/current && php artisan db:wipe --drop-types --force'",
-            "ssh root@c7669.cloudnet.cloud -o \"StrictHostKeyChecking no\" 'cat /tmp/db_{$db}.sql | sudo -i -u forge /usr/bin/psql {$db}'",
-            "ssh root@c7669.cloudnet.cloud -o \"StrictHostKeyChecking no\" 'rm -f /tmp/db_{$db}.sql'",
-            "ssh root@c7669.cloudnet.cloud -o \"StrictHostKeyChecking no\" \"{$replace}\"",
-            "ssh root@c7669.cloudnet.cloud -o \"StrictHostKeyChecking no\" 'cd {$path}/current && php artisan migrate && php artisan optimize:clear'",
+            "ssh {$host} -o \"StrictHostKeyChecking no\" 'gzip -df /tmp/db_{$db}.sql.gz'",
+            "ssh {$host} -o \"StrictHostKeyChecking no\" 'cd {$path} && php artisan db:wipe --drop-types --force'",
+            "ssh {$host} -o \"StrictHostKeyChecking no\" 'cat /tmp/db_{$db}.sql | sudo -i -u forge /usr/bin/psql {$db}'",
+            "ssh {$host} -o \"StrictHostKeyChecking no\" 'rm -f /tmp/db_{$db}.sql'",
+            "ssh {$host} -o \"StrictHostKeyChecking no\" \"{$replace}\"",
+            "ssh {$host} -o \"StrictHostKeyChecking no\" 'cd {$path}/current && php artisan migrate && php artisan optimize:clear'",
         ];
 
         foreach ($actions as $action) {
