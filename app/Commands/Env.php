@@ -52,16 +52,16 @@ class Env extends Command
             $result = "forge@16.16.179.110";
         }
         if($environment == "develop") {
-            $result = "forge@13.49.49.40";
+            $result = "forge@13.51.90.196";
         }
         if($environment == "dev1") {
-            $result = "forge@13.49.49.40";
+            $result = "forge@13.51.90.196";
         }
         if($environment == "dev2") {
-            $result = "forge@13.49.49.40";
+            $result = "forge@13.51.90.196";
         }
         if($environment == "dev3") {
-            $result = "forge@13.49.49.40";
+            $result = "forge@13.51.90.196";
         }
         return $result;
     }
