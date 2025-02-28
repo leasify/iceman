@@ -46,61 +46,64 @@ class Env extends Command
         // $schedule->command(static::class)->everyMinute();
     }
 
-    public static function matchHost($environment) : string {
+    public static function matchHost($environment): string
+    {
         $result = "";
-        if($environment == "prod" || $environment == "production") {
-            $result = "forge@16.16.179.110";
+        if ($environment == "prod" || $environment == "production") {
+            $result = "forge@16.16.252.26";
         }
-        if($environment == "develop") {
+        if ($environment == "develop") {
             $result = "forge@13.51.90.196";
         }
-        if($environment == "dev1") {
+        if ($environment == "dev1") {
             $result = "forge@13.51.90.196";
         }
-        if($environment == "dev2") {
+        if ($environment == "dev2") {
             $result = "forge@13.51.90.196";
         }
-        if($environment == "dev3") {
+        if ($environment == "dev3") {
             $result = "forge@13.51.90.196";
         }
         return $result;
     }
 
-    public static function matchDatabase($environment) : string {
+    public static function matchDatabase($environment): string
+    {
         $result = "";
-        if($environment == "prod" || $environment == "production") {
+        if ($environment == "prod" || $environment == "production") {
             $result = "production";
         }
-        if($environment == "develop") {
+        if ($environment == "develop") {
             $result = "develop";
         }
-        if($environment == "dev1") {
+        if ($environment == "dev1") {
             $result = "dev1";
         }
-        if($environment == "dev2") {
+        if ($environment == "dev2") {
             $result = "dev2";
         }
-        if($environment == "dev3") {
+        if ($environment == "dev3") {
             $result = "dev3";
         }
         return $result;
     }
 
-    public static function matchPath($environment) : string {
+    public static function matchPath($environment): string
+    {
         $result = "";
-        if($environment == "prod" || $environment == "production") {
+        if ($environment == "prod" || $environment == "production") {
             $result = "/home/forge/app.leasify.se";
         }
-        if($environment == "develop") {
+        if ($environment == "develop") {
             $result = "/home/forge/develop.leasify.se";
         }
-        if($environment == "dev1") {
+        if ($environment == "dev1") {
             $result = "/home/forge/dev1.leasify.se";
         }
-        if($environment == "dev2") {
+        if ($environment == "dev2") {
             $result = "/home/forge/dev2.leasify.se";
         }
-        if($environment == "dev3") {
+        if ($environment == "dev3") {
             $result = "/home/forge/dev3.leasify.se";
         }
         return $result;

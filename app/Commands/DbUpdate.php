@@ -61,12 +61,12 @@ class DbUpdate extends Command
             return;
         }
 
-        if ($host == "forge@16.16.179.110") {
+        if ($host == "forge@16.16.252.26") {
             $this->error("<error>Nothing allowed on db prod.</error>");
             return;
         }
 
-        if (strpos($host, "16.16.179.110")) {
+        if (strpos($host, "16.16.252.26")) {
             $this->error("<error>Nothing allowed on db prod.</error>");
             return;
         }
@@ -84,7 +84,7 @@ class DbUpdate extends Command
         $replace = 'sudo -i -u postgres /usr/bin/psql ' . $db . ' -c \"UPDATE users SET email=concat(email,\'.cc\');\"';
 
         $actions = [
-            "ssh forge@16.16.179.110 -o \"StrictHostKeyChecking no\" 'sudo -i -u forge /usr/bin/pg_dump production | gzip' > db_{$db}.sql.gz",
+            "ssh forge@16.16.252.26 -o \"StrictHostKeyChecking no\" 'sudo -i -u forge /usr/bin/pg_dump production | gzip' > db_{$db}.sql.gz",
             "scp db_{$db}.sql.gz {$host}:/tmp/db_{$db}.sql.gz",
             "rm db_{$db}.sql.gz",
             "ssh {$host} -o \"StrictHostKeyChecking no\" 'gzip -df /tmp/db_{$db}.sql.gz'",

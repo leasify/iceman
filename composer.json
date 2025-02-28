@@ -1,7 +1,13 @@
 {
     "name": "leasify/iceman",
     "description": "Internal pipeline tool at Leasify",
-    "keywords": ["framework", "laravel", "laravel zero", "console", "cli"],
+    "keywords": [
+        "framework",
+        "laravel",
+        "laravel zero",
+        "console",
+        "cli"
+    ],
     "homepage": "https://leasify.se",
     "type": "project",
     "license": "MIT",
@@ -12,7 +18,7 @@
         }
     ],
     "require": {
-        "php": "^8.1"
+        "php": "^8.3"
     },
     "require-dev": {
         "mockery/mockery": "*",
@@ -39,5 +45,7 @@
     },
     "minimum-stability": "dev",
     "prefer-stable": true,
-    "bin": ["builds/iceman"]
+    "bin": [
+        "builds/iceman"
+    ]
 }
