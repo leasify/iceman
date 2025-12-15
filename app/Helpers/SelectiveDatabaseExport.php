@@ -33,10 +33,14 @@ class SelectiveDatabaseExport
         'jobs',
         'job_batches',
         'personal_access_tokens',
+        'help_texts',
+        'guides',
+        'languages',
     ];
 
     protected array $tableCategories = [
         'with_company_id' => [],
+        'with_user_id' => [],
         'with_ifrs_setting_id' => [],
         'with_ifrs_settings_id' => [],
         'all_tables' => [],
@@ -95,6 +99,11 @@ class SelectiveDatabaseExport
         $result = $this->runRemoteQuery($companyQuery);
         $this->tableCategories['with_company_id'] = array_filter(explode("\n", trim($result)));
 
+        // Hämta tabeller med user_id (kopplas till company via users.company_id)
+        $userQuery = "SELECT table_name FROM information_schema.columns WHERE table_schema = 'public' AND column_name = 'user_id'";
+        $result = $this->runRemoteQuery($userQuery);
+        $this->tableCategories['with_user_id'] = array_filter(explode("\n", trim($result)));
+
         // Hämta tabeller med ifrs_setting_id
         $ifrsQuery = "SELECT table_name FROM information_schema.columns WHERE table_schema = 'public' AND column_name = 'ifrs_setting_id'";
         $result = $this->runRemoteQuery($ifrsQuery);
@@ -107,6 +116,7 @@ class SelectiveDatabaseExport
 
         $this->command->info("Found " . count($this->tableCategories['all_tables']) . " tables");
         $this->command->info("  - " . count($this->tableCategories['with_company_id']) . " with company_id");
+        $this->command->info("  - " . count($this->tableCategories['with_user_id']) . " with user_id");
         $this->command->info("  - " . count($this->tableCategories['with_ifrs_setting_id']) . " with ifrs_setting_id");
         $this->command->info("  - " . count($this->tableCategories['with_ifrs_settings_id']) . " with ifrs_settings_id");
 
@@ -221,65 +231,99 @@ class SelectiveDatabaseExport
 
     protected function exportData(): void
     {
-        // Tabeller är redan sorterade efter FK-beroenden i fetchTableDependencies()
         $tables = $this->tableCategories['all_tables'];
         $totalTables = count($tables);
         $companyIdList = implode(',', $this->companyIds);
+        $batchSize = 25;
 
-        $progressBar = $this->command->getOutput()->createProgressBar($totalTables);
-        $progressBar->setFormat(" %current%/%max% [%bar%] %percent:3s%% %message%");
+        // Hämta alla kolumner i EN query
+        $this->command->info("Fetching column information...");
+        $allColumnsQuery = "SELECT table_name, string_agg(column_name, ',' ORDER BY ordinal_position) as cols FROM information_schema.columns WHERE table_schema = 'public' GROUP BY table_name";
+        $result = $this->runRemoteQuery($allColumnsQuery);
+
+        $tableColumns = [];
+        foreach (array_filter(explode("\n", trim($result))) as $line) {
+            $parts = explode('|', $line);
+            if (count($parts) === 2) {
+                $tableColumns[trim($parts[0])] = trim($parts[1]);
+            }
+        }
+
+        // Dela upp i batches
+        $batches = array_chunk($tables, $batchSize);
+        $totalBatches = count($batches);
+
+        $progressBar = $this->command->getOutput()->createProgressBar($totalBatches);
+        $progressBar->setFormat(" Batch %current%/%max% [%bar%] %percent:3s%% %message%");
         $progressBar->start();
 
         $dataFile = "/tmp/{$this->localDB}-data.sql";
         $handle = fopen($dataFile, 'w');
 
-        // Disable triggers och foreign key checks för smidigare import
+        // Disable triggers och foreign key checks
         fwrite($handle, "SET session_replication_role = 'replica';\n\n");
 
-        foreach ($tables as $table) {
-            $progressBar->setMessage("Exporting {$table}...");
+        foreach ($batches as $batchIndex => $batchTables) {
+            $progressBar->setMessage("Tables " . ($batchIndex * $batchSize + 1) . "-" . min(($batchIndex + 1) * $batchSize, $totalTables) . "...");
 
-            $selectQuery = $this->buildSelectQuery($table, $companyIdList);
+            // Bygg ett psql-script för hela batchen
+            $copyCommands = [];
+            foreach ($batchTables as $table) {
+                $columns = $tableColumns[$table] ?? '';
+                if (empty($columns)) {
+                    continue;
+                }
 
-            // Hämta kolumnnamn för tabellen (med korrekt ORDER BY syntax)
-            $columnsQuery = "SELECT string_agg(column_name, ',' ORDER BY ordinal_position) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '{$table}'";
-            $columns = trim($this->runRemoteQuery($columnsQuery));
+                $selectQuery = $this->buildSelectQuery($table, $companyIdList);
+                $copyCommands[] = "\\echo '-- Table: {$table}'";
+                $copyCommands[] = "\\copy ({$selectQuery}) TO STDOUT";
+            }
 
-            if (empty($columns)) {
+            if (empty($copyCommands)) {
                 $progressBar->advance();
                 continue;
             }
 
-            // Formatera kolumnnamn med quotes
-            $columnList = implode(', ', array_map(fn($col) => '"' . trim($col) . '"', explode(',', $columns)));
-
-            // Skriv COPY header
-            fwrite($handle, "-- Table: {$table}\n");
-            fwrite($handle, "COPY \"{$table}\" ({$columnList}) FROM stdin;\n");
-
-            // Använd heredoc och skriv direkt till fil (streama för att undvika minnesöverskridning)
-            $exportCmd = "ssh {$this->host} -o \"StrictHostKeyChecking no\" 'sudo -i -u forge psql -q {$this->db} << ENDSQL
-\\copy ({$selectQuery}) TO STDOUT
+            // Kör alla COPY-kommandon i en SSH-session
+            $script = implode("\n", $copyCommands);
+            $exportCmd = "ssh {$this->host} -o \"StrictHostKeyChecking no\" 'sudo -i -u forge psql -q {$this->db} << \"ENDSQL\"
+{$script}
 ENDSQL' 2>/dev/null";
 
-            // Kör kommandot och skriv output direkt till filen
             $process = popen($exportCmd, 'r');
+            $currentTable = null;
             $hasData = false;
+
             if ($process) {
                 while (($line = fgets($process)) !== false) {
-                    $hasData = true;
-                    fwrite($handle, $line);
+                    // Kolla om det är en tabell-header
+                    if (preg_match('/^-- Table: (.+)$/', trim($line), $matches)) {
+                        // Avsluta föregående tabell
+                        if ($currentTable !== null && $hasData) {
+                            fwrite($handle, "\\.\n\n");
+                        }
+
+                        // Starta ny tabell
+                        $currentTable = $matches[1];
+                        $columns = $tableColumns[$currentTable] ?? '';
+                        if (!empty($columns)) {
+                            $columnList = implode(', ', array_map(fn($col) => '"' . trim($col) . '"', explode(',', $columns)));
+                            fwrite($handle, "-- Table: {$currentTable}\n");
+                            fwrite($handle, "COPY \"{$currentTable}\" ({$columnList}) FROM stdin;\n");
+                        }
+                        $hasData = false;
+                    } elseif ($currentTable !== null && trim($line) !== '') {
+                        // Skriv data direkt till fil (streaming)
+                        fwrite($handle, $line);
+                        $hasData = true;
+                    }
                 }
                 pclose($process);
-            }
 
-            // Avsluta COPY-blocket om vi hade data, annars ta bort header
-            if ($hasData) {
-                fwrite($handle, "\\.\n\n");
-            } else {
-                // Spola tillbaka och skriv över header om ingen data
-                // (vi hoppar över detta för enkelhet - tom COPY är OK)
-                fwrite($handle, "\\.\n\n");
+                // Avsluta sista tabellen
+                if ($currentTable !== null && $hasData) {
+                    fwrite($handle, "\\.\n\n");
+                }
             }
 
             $progressBar->advance();
@@ -309,9 +353,21 @@ ENDSQL' 2>/dev/null";
             return "SELECT * FROM \"{$table}\" WHERE id IN ({$companyIdList})";
         }
 
+        // Specialfall: users-tabellen filtreras på company_id
+        if ($table === 'users') {
+            return "SELECT * FROM \"{$table}\" WHERE company_id IN ({$companyIdList})";
+        }
+
         // Kontrollera om tabellen har company_id
         if (in_array($table, $this->tableCategories['with_company_id'])) {
             return "SELECT * FROM \"{$table}\" WHERE company_id IN ({$companyIdList})";
+        }
+
+        // Kontrollera om tabellen har user_id (koppla via users.company_id)
+        // Endast om tabellen INTE redan har company_id
+        if (in_array($table, $this->tableCategories['with_user_id']) &&
+            !in_array($table, $this->tableCategories['with_company_id'])) {
+            return "SELECT t.* FROM \"{$table}\" t INNER JOIN users u ON t.user_id = u.id WHERE u.company_id IN ({$companyIdList})";
         }
 
         // Kontrollera om tabellen har ifrs_setting_id
