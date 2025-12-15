@@ -38,6 +38,17 @@ class SelectiveDatabaseExport
         'languages',
     ];
 
+    /**
+     * Tabeller som helt ska hoppas över (för stora/onödiga för dev)
+     */
+    protected array $skippedTables = [
+        'activity_log',
+        'action_events',
+        'notifications',
+        'contract_version_report',
+        'contract_balances',
+    ];
+
     protected array $tableCategories = [
         'with_company_id' => [],
         'with_user_id' => [],
@@ -231,7 +242,17 @@ class SelectiveDatabaseExport
 
     protected function exportData(): void
     {
-        $tables = $this->tableCategories['all_tables'];
+        // Filtrera bort tabeller som ska hoppas över helt
+        $tables = array_filter(
+            $this->tableCategories['all_tables'],
+            fn($table) => !$this->isSkippedTable($table)
+        );
+        $tables = array_values($tables); // Re-index
+
+        if (count($this->skippedTables) > 0) {
+            $this->command->info("Skipping " . count($this->skippedTables) . " large tables: " . implode(', ', $this->skippedTables));
+        }
+
         $totalTables = count($tables);
         $companyIdList = implode(',', $this->companyIds);
         $batchSize = 25;
@@ -392,6 +413,11 @@ ENDSQL' 2>/dev/null";
             }
         }
         return false;
+    }
+
+    protected function isSkippedTable(string $table): bool
+    {
+        return in_array($table, $this->skippedTables);
     }
 
     protected function runRemoteQuery(string $query): string
