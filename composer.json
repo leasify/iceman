@@ -21,9 +21,10 @@
         "php": "^8.3"
     },
     "require-dev": {
+        "laravel-zero/framework": "*",
+        "laravel/boost": "^1.8",
         "mockery/mockery": "*",
-        "pestphp/pest": "*",
-        "laravel-zero/framework": "*"
+        "pestphp/pest": "*"
     },
     "autoload": {
         "psr-4": {

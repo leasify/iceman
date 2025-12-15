@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use App\Helpers\Environment;
+use App\Helpers\SelectiveDatabaseExport;
 use Illuminate\Console\Scheduling\Schedule;
 use LaravelZero\Framework\Commands\Command;
 
@@ -13,7 +14,7 @@ class Pull extends Command
      *
      * @var string
      */
-    protected $signature = 'pull {environment : Environment to fetch, eg prod} {--fresh}';
+    protected $signature = 'pull {environment : Environment to fetch, eg prod} {--fresh} {--company= : Extra company IDs to include, comma-separated (adds to default 1,13,32)}';
 
     /**
      * The description of the command.
@@ -57,21 +58,37 @@ class Pull extends Command
             return;
         }
 
-        $actions = [];
-
-        if($this->option('fresh') || !file_exists("/tmp/{$localDB}-db.sql.gz")) {
-            $this->info("Fresh database fetch for this pull...");
-            $actions[] = "ssh {$host} -o \"StrictHostKeyChecking no\" 'sudo -i -u forge /usr/bin/pg_dump {$db} | gzip' > /tmp/{$localDB}-db.sql.gz";
+        // Bygg company ID-lista
+        $companyIds = [1, 13, 32];
+        if ($extraCompanies = $this->option('company')) {
+            $extras = array_filter(array_map('intval', explode(',', $extraCompanies)));
+            $companyIds = array_values(array_unique(array_merge($companyIds, $extras)));
         }
 
-        $actions = array_merge($actions, [
-            "gzip -cdf /tmp/{$localDB}-db.sql.gz > db.sql",
-            "php artisan db:wipe --drop-types",
-            "cat db.sql | psql {$localDB}",
-            "rm db.sql",
-        ]);
+        $this->info("Company IDs to fetch: " . implode(', ', $companyIds));
 
-        if($db == 'production') {
+        // Selektiv export
+        if ($this->option('fresh') || !file_exists("/tmp/{$localDB}-schema.sql.gz") || !file_exists("/tmp/{$localDB}-data.sql.gz")) {
+            $this->info("Fresh database fetch for this pull...");
+
+            $exporter = new SelectiveDatabaseExport($this, $host, $db, $localDB, $companyIds);
+            $exporter->export();
+        } else {
+            $this->info("Using cached database files...");
+        }
+
+        // Import
+        $this->info("Importing database...");
+        $actions = [
+            "gzip -cdf /tmp/{$localDB}-schema.sql.gz > /tmp/{$localDB}-schema.sql",
+            "php artisan db:wipe --drop-types",
+            "cat /tmp/{$localDB}-schema.sql | psql {$localDB}",
+            "gzip -cdf /tmp/{$localDB}-data.sql.gz > /tmp/{$localDB}-data.sql",
+            "cat /tmp/{$localDB}-data.sql | psql {$localDB}",
+            "rm /tmp/{$localDB}-schema.sql /tmp/{$localDB}-data.sql",
+        ];
+
+        if ($db == 'production') {
             $actions[] = "psql -d {$localDB} -c \"UPDATE users SET email=concat(email,'.cc');\"";
         }
 
@@ -80,8 +97,12 @@ class Pull extends Command
         foreach ($actions as $action) {
             $this->info($action);
             $result = shell_exec($action);
-            $this->info($result);
+            if ($result) {
+                $this->line($result);
+            }
         }
+
+        $this->info("Done! Database imported with company IDs: " . implode(', ', $companyIds));
     }
 
     /**
