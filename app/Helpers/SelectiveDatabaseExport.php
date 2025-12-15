@@ -110,8 +110,8 @@ class SelectiveDatabaseExport
 
             $selectQuery = $this->buildSelectQuery($table, $companyIdList);
 
-            // Hämta kolumnnamn för tabellen
-            $columnsQuery = "SELECT string_agg(column_name, ',') FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '{$table}' ORDER BY ordinal_position";
+            // Hämta kolumnnamn för tabellen (med korrekt ORDER BY syntax)
+            $columnsQuery = "SELECT string_agg(column_name, ',' ORDER BY ordinal_position) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '{$table}'";
             $columns = trim($this->runRemoteQuery($columnsQuery));
 
             if (empty($columns)) {
@@ -119,9 +119,11 @@ class SelectiveDatabaseExport
                 continue;
             }
 
-            // Kör COPY TO STDOUT via psql och fånga output
-            $copyCmd = "COPY ({$selectQuery}) TO STDOUT";
-            $exportCmd = "ssh {$this->host} -o \"StrictHostKeyChecking no\" 'sudo -i -u forge psql {$this->db} -c \"" . addslashes($copyCmd) . "\"' 2>/dev/null";
+            // Använd \copy via echo pipe till psql - detta fungerar utan superuser
+            $copyCmd = "\\copy ({$selectQuery}) TO STDOUT";
+
+            // Escape för shell och skicka via echo pipe
+            $exportCmd = "echo " . escapeshellarg($copyCmd) . " | ssh {$this->host} -o \"StrictHostKeyChecking no\" 'sudo -i -u forge psql -q {$this->db}' 2>/dev/null";
 
             $data = shell_exec($exportCmd);
 
