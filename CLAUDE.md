@@ -33,11 +33,12 @@ The `pull` command filters data by `company_id` to reduce local database size.
 **Default company IDs**: 1, 13, 32
 
 **Filtering logic** (in `SelectiveDatabaseExport.php`):
-1. Tables with `company_id` column → `WHERE company_id IN (...)`
-2. Tables with `ifrs_setting_id` → JOIN to `ifrs_settings` table for company filtering
-3. Tables with `ifrs_settings_id` → JOIN to `ifrs_settings` table for company filtering
-4. Tables without these columns → fetched in full
-5. Tables in `$excludedTables` array → always fetched in full
+1. Tables in `$excludedTables` array → always fetched in full
+2. `companies` table → `WHERE id IN (...)` (special case - it IS the company table)
+3. Tables with `company_id` column → `WHERE company_id IN (...)`
+4. Tables with `ifrs_setting_id` → JOIN to `ifrs_settings` table for company filtering
+5. Tables with `ifrs_settings_id` → JOIN to `ifrs_settings` table for company filtering
+6. Tables without these columns → fetched in full
 
 ## Common Tasks
 

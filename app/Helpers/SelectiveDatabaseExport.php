@@ -178,6 +178,11 @@ ENDSQL' 2>/dev/null";
             return "SELECT * FROM \"{$table}\"";
         }
 
+        // Specialfall: companies-tabellen filtreras på id (den ÄR company-tabellen)
+        if ($table === 'companies') {
+            return "SELECT * FROM \"{$table}\" WHERE id IN ({$companyIdList})";
+        }
+
         // Kontrollera om tabellen har company_id
         if (in_array($table, $this->tableCategories['with_company_id'])) {
             return "SELECT * FROM \"{$table}\" WHERE company_id IN ({$companyIdList})";
