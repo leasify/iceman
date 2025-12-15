@@ -67,15 +67,29 @@ Tables starting with `telescope_` are automatically excluded.
 
 ### Releasing a New Version
 
+**IMPORTANT**: The phar must be built and committed BEFORE tagging. The version in the CLI comes from the build, not the git tag.
+
 ```bash
+# 1. Build the phar with the new version number
 php iceman app:build iceman --build-version=X.Y.Z
-git add .
-git commit -m 'description'
+
+# 2. Commit the built phar
+git add builds/iceman
+git commit -m 'X.Y.Z release'
+
+# 3. Tag and push
 git tag X.Y.Z
-git push origin branch-name --tags
+git push origin main --tags
 ```
 
-Then users run `composer global update` to get the new version.
+If you already tagged before building, fix it:
+```bash
+git tag -d X.Y.Z                      # Delete local tag
+git push origin :refs/tags/X.Y.Z      # Delete remote tag
+# Then build, commit, and re-tag
+```
+
+Users update with: `composer global update leasify/iceman`
 
 ## Environment Configuration
 
