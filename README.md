@@ -19,15 +19,23 @@ The `pull` command fetches a filtered subset of the production database to your 
 ### Usage
 
 ```bash
-# Basic usage (uses cached files if available)
-iceman pull prod
-
-# Force fresh database dump
+# Full database dump (fastest, entire database)
 iceman pull prod --fresh
 
-# Include extra companies (adds to default 1,13,32)
-iceman pull prod --fresh --company=45,67
+# Selective export by company IDs (smaller, slower)
+iceman pull prod --fresh --company=1,13,32
+
+# Add extra companies to selective export
+iceman pull prod --fresh --company=1,13,32,45,67
+
+# Use cached files (no --fresh)
+iceman pull prod
 ```
+
+| Mode | Flag | Speed | Size |
+|------|------|-------|------|
+| Full dump | (no --company) | Fast | ~500MB+ |
+| Selective | --company=1,13,32 | Slower | ~50MB |
 
 ### How It Works
 
