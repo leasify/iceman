@@ -144,11 +144,11 @@ class SelectiveDatabaseExport
                 continue;
             }
 
-            // Använd \copy via echo pipe till psql - detta fungerar utan superuser
-            $copyCmd = "\\copy ({$selectQuery}) TO STDOUT";
-
-            // Escape för shell och skicka via echo pipe
-            $exportCmd = "echo " . escapeshellarg($copyCmd) . " | ssh {$this->host} -o \"StrictHostKeyChecking no\" 'sudo -i -u forge psql -q {$this->db}' 2>/dev/null";
+            // Använd \copy via heredoc - detta fungerar utan superuser
+            // Heredoc approach som fungerar
+            $exportCmd = "ssh {$this->host} -o \"StrictHostKeyChecking no\" 'sudo -i -u forge psql -q {$this->db} << ENDSQL
+\\copy ({$selectQuery}) TO STDOUT
+ENDSQL' 2>/dev/null";
 
             $data = shell_exec($exportCmd);
 
