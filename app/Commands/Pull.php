@@ -130,21 +130,46 @@ class Pull extends Command
      */
     protected function fullDatabaseDump(string $host, string $db, string $localDB): void
     {
-        @unlink("/tmp/{$localDB}-full.sql.gz");
+        $outputFile = "/tmp/{$localDB}-full.sql.gz";
+        @unlink($outputFile);
 
         $this->info("Streaming full database dump with compression...");
 
         // Use pg_dump with --no-owner --no-acl for cleaner import
         // Stream through gzip for compression during transfer
-        $cmd = "ssh {$host} -o \"StrictHostKeyChecking no\" 'sudo -i -u forge /usr/bin/pg_dump --no-owner --no-acl {$db} | gzip -1' > /tmp/{$localDB}-full.sql.gz";
+        $cmd = "ssh {$host} -o \"StrictHostKeyChecking no\" 'sudo -i -u forge /usr/bin/pg_dump --no-owner --no-acl {$db} | gzip -1' > {$outputFile}";
 
         $startTime = microtime(true);
 
-        // Run with passthru to show progress
-        passthru($cmd, $returnCode);
+        // Start process in background
+        $process = popen($cmd, 'r');
+
+        if ($process) {
+            // Show progress while downloading
+            $spinner = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+            $i = 0;
+
+            while (!feof($process)) {
+                fread($process, 1024); // Keep reading to not block
+
+                $size = file_exists($outputFile) ? filesize($outputFile) : 0;
+                $sizeMB = round($size / 1024 / 1024, 1);
+                $elapsed = round(microtime(true) - $startTime);
+                $speed = $elapsed > 0 ? round($sizeMB / $elapsed, 1) : 0;
+
+                $spin = $spinner[$i % count($spinner)];
+                $this->output->write("\r {$spin} Downloading... {$sizeMB}MB ({$speed}MB/s) - {$elapsed}s  ");
+
+                $i++;
+                usleep(200000); // 200ms
+            }
+
+            pclose($process);
+            $this->output->write("\r" . str_repeat(' ', 60) . "\r"); // Clear line
+        }
 
         $elapsed = microtime(true) - $startTime;
-        $size = file_exists("/tmp/{$localDB}-full.sql.gz") ? filesize("/tmp/{$localDB}-full.sql.gz") : 0;
+        $size = file_exists($outputFile) ? filesize($outputFile) : 0;
         $sizeMB = round($size / 1024 / 1024, 1);
 
         $this->info("Dump complete: {$sizeMB}MB in " . round($elapsed) . "s");
