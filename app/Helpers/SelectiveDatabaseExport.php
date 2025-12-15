@@ -12,7 +12,16 @@ class SelectiveDatabaseExport
     protected string $localDB;
     protected array $companyIds;
 
-    // Systemtabeller som alltid ska hämtas i sin helhet
+    /**
+     * Tabeller som alltid ska hämtas i sin helhet (ej filtreras på company_id).
+     *
+     * INSTRUKTION FÖR ATT LÄGGA TILL FLER TABELLER:
+     * Om en tabell behöver hämtas i sin helhet (utan company_id-filtrering),
+     * lägg till tabellnamnet i denna array. Tabeller som börjar med 'telescope_'
+     * hanteras automatiskt.
+     *
+     * Exempel: Om tabellen 'settings' ska hämtas helt, lägg till 'settings' här.
+     */
     protected array $excludedTables = [
         'migrations',
         'password_resets',
@@ -52,6 +61,22 @@ class SelectiveDatabaseExport
 
         $this->command->info("Exporting data selectively for company IDs: " . implode(', ', $this->companyIds));
         $this->exportData();
+    }
+
+    /**
+     * Lägg till tabeller som ska hämtas i sin helhet (ej filtreras på company_id)
+     */
+    public function addExcludedTables(array $tables): void
+    {
+        $this->excludedTables = array_unique(array_merge($this->excludedTables, $tables));
+    }
+
+    /**
+     * Hämta nuvarande lista över undantagna tabeller
+     */
+    public function getExcludedTables(): array
+    {
+        return $this->excludedTables;
     }
 
     protected function fetchTableCategories(): void
@@ -215,7 +240,9 @@ class SelectiveDatabaseExport
 
     protected function runRemoteQuery(string $query): string
     {
-        $cmd = "ssh {$this->host} -o \"StrictHostKeyChecking no\" 'sudo -i -u forge psql -t -A {$this->db} -c \"" . addslashes($query) . "\"' 2>/dev/null";
+        // Bygg kommando med double quotes och escape för att undvika quote-problem
+        $cmd = "ssh {$this->host} -o \"StrictHostKeyChecking no\" \"sudo -i -u forge psql -t -A {$this->db} -c \\\"" . str_replace('"', '\\"', $query) . "\\\"\" 2>/dev/null";
+
         return shell_exec($cmd) ?? '';
     }
 
