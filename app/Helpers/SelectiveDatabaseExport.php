@@ -284,8 +284,22 @@ class SelectiveDatabaseExport
         // Disable triggers och foreign key checks
         fwrite($handle, "SET session_replication_role = 'replica';\n\n");
 
+        // Time tracking for ETA
+        $startTime = microtime(true);
+        $batchTimes = [];
+
         foreach ($batches as $batchIndex => $batchTables) {
-            $progressBar->setMessage("Tables " . ($batchIndex * $batchSize + 1) . "-" . min(($batchIndex + 1) * $batchSize, $totalTables) . "...");
+            $batchStart = microtime(true);
+
+            // Calculate ETA
+            $etaMessage = "";
+            if ($batchIndex > 0 && count($batchTimes) > 0) {
+                $avgTime = array_sum($batchTimes) / count($batchTimes);
+                $remaining = ($totalBatches - $batchIndex) * $avgTime;
+                $etaMessage = " ~" . $this->formatTime($remaining) . " left";
+            }
+
+            $progressBar->setMessage("Tables " . ($batchIndex * $batchSize + 1) . "-" . min(($batchIndex + 1) * $batchSize, $totalTables) . "..." . $etaMessage);
 
             // Bygg ett psql-script för hela batchen
             $copyCommands = [];
@@ -346,6 +360,9 @@ ENDSQL' 2>/dev/null";
                     fwrite($handle, "\\.\n\n");
                 }
             }
+
+            // Track batch time for ETA calculation
+            $batchTimes[] = microtime(true) - $batchStart;
 
             $progressBar->advance();
         }
@@ -418,6 +435,21 @@ ENDSQL' 2>/dev/null";
     protected function isSkippedTable(string $table): bool
     {
         return in_array($table, $this->skippedTables);
+    }
+
+    protected function formatTime(float $seconds): string
+    {
+        if ($seconds < 60) {
+            return (int) $seconds . "s";
+        } elseif ($seconds < 3600) {
+            $mins = (int) ($seconds / 60);
+            $secs = (int) ($seconds % 60);
+            return "{$mins}m {$secs}s";
+        } else {
+            $hours = (int) ($seconds / 3600);
+            $mins = (int) (($seconds % 3600) / 60);
+            return "{$hours}h {$mins}m";
+        }
     }
 
     protected function runRemoteQuery(string $query): string
