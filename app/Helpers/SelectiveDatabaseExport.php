@@ -108,14 +108,25 @@ class SelectiveDatabaseExport
         foreach ($tables as $table) {
             $progressBar->setMessage("Exporting {$table}...");
 
-            $copyCommand = $this->buildCopyCommand($table, $companyIdList);
-            $exportCmd = "ssh {$this->host} -o \"StrictHostKeyChecking no\" 'sudo -i -u forge psql {$this->db} -c \"" . addslashes($copyCommand) . "\"' 2>/dev/null";
+            $selectQuery = $this->buildSelectQuery($table, $companyIdList);
+
+            // Hämta kolumnnamn för tabellen
+            $columnsQuery = "SELECT string_agg(column_name, ',') FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '{$table}' ORDER BY ordinal_position";
+            $columns = trim($this->runRemoteQuery($columnsQuery));
+
+            if (empty($columns)) {
+                $progressBar->advance();
+                continue;
+            }
+
+            // Kör COPY TO STDOUT via psql och fånga output
+            $copyCmd = "COPY ({$selectQuery}) TO STDOUT";
+            $exportCmd = "ssh {$this->host} -o \"StrictHostKeyChecking no\" 'sudo -i -u forge psql {$this->db} -c \"" . addslashes($copyCmd) . "\"' 2>/dev/null";
 
             $data = shell_exec($exportCmd);
 
             if ($data && trim($data) !== '') {
-                // Konvertera COPY output till INSERT eller använd COPY FROM stdin
-                $this->writeTableData($handle, $table, $data);
+                $this->writeTableData($handle, $table, $columns, $data);
             }
 
             $progressBar->advance();
@@ -133,30 +144,30 @@ class SelectiveDatabaseExport
         shell_exec("gzip -f {$dataFile}");
     }
 
-    protected function buildCopyCommand(string $table, string $companyIdList): string
+    protected function buildSelectQuery(string $table, string $companyIdList): string
     {
-        // Kontrollera om tabellen är undantagen (systemtabeller)
+        // Kontrollera om tabellen är undantagen (systemtabeller) - hämta allt
         if ($this->isExcludedTable($table)) {
-            return "\\COPY {$table} TO STDOUT WITH (FORMAT csv, HEADER true, NULL 'NULL')";
+            return "SELECT * FROM \"{$table}\"";
         }
 
         // Kontrollera om tabellen har company_id
         if (in_array($table, $this->tableCategories['with_company_id'])) {
-            return "\\COPY (SELECT * FROM {$table} WHERE company_id IN ({$companyIdList})) TO STDOUT WITH (FORMAT csv, HEADER true, NULL 'NULL')";
+            return "SELECT * FROM \"{$table}\" WHERE company_id IN ({$companyIdList})";
         }
 
         // Kontrollera om tabellen har ifrs_setting_id
         if (in_array($table, $this->tableCategories['with_ifrs_setting_id'])) {
-            return "\\COPY (SELECT t.* FROM {$table} t INNER JOIN ifrs_settings i ON t.ifrs_setting_id = i.id WHERE i.company_id IN ({$companyIdList})) TO STDOUT WITH (FORMAT csv, HEADER true, NULL 'NULL')";
+            return "SELECT t.* FROM \"{$table}\" t INNER JOIN ifrs_settings i ON t.ifrs_setting_id = i.id WHERE i.company_id IN ({$companyIdList})";
         }
 
         // Kontrollera om tabellen har ifrs_settings_id (plural)
         if (in_array($table, $this->tableCategories['with_ifrs_settings_id'])) {
-            return "\\COPY (SELECT t.* FROM {$table} t INNER JOIN ifrs_settings i ON t.ifrs_settings_id = i.id WHERE i.company_id IN ({$companyIdList})) TO STDOUT WITH (FORMAT csv, HEADER true, NULL 'NULL')";
+            return "SELECT t.* FROM \"{$table}\" t INNER JOIN ifrs_settings i ON t.ifrs_settings_id = i.id WHERE i.company_id IN ({$companyIdList})";
         }
 
         // Ingen filtrering - hämta allt
-        return "\\COPY {$table} TO STDOUT WITH (FORMAT csv, HEADER true, NULL 'NULL')";
+        return "SELECT * FROM \"{$table}\"";
     }
 
     protected function isExcludedTable(string $table): bool
@@ -169,20 +180,27 @@ class SelectiveDatabaseExport
         return false;
     }
 
-    protected function writeTableData($handle, string $table, string $csvData): void
+    protected function writeTableData($handle, string $table, string $columns, string $data): void
     {
-        $lines = explode("\n", trim($csvData));
-        if (count($lines) < 2) {
-            // Endast header, ingen data
+        $lines = explode("\n", $data);
+        $hasData = false;
+
+        foreach ($lines as $line) {
+            if (trim($line) !== '') {
+                $hasData = true;
+                break;
+            }
+        }
+
+        if (!$hasData) {
             return;
         }
 
-        // Första raden är header med kolumnnamn
-        $header = str_getcsv(array_shift($lines));
-        $columns = implode(', ', array_map(fn($col) => '"' . $col . '"', $header));
+        // Formatera kolumnnamn med quotes
+        $columnList = implode(', ', array_map(fn($col) => '"' . trim($col) . '"', explode(',', $columns)));
 
         fwrite($handle, "-- Table: {$table}\n");
-        fwrite($handle, "COPY {$table} ({$columns}) FROM stdin WITH (FORMAT csv, NULL 'NULL');\n");
+        fwrite($handle, "COPY \"{$table}\" ({$columnList}) FROM stdin;\n");
 
         foreach ($lines as $line) {
             if (trim($line) !== '') {
