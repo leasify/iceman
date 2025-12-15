@@ -53,6 +53,10 @@ class SelectiveDatabaseExport
 
     public function export(): void
     {
+        // Ta bort gamla filer så att avbruten export inte läser gammal data
+        @unlink("/tmp/{$this->localDB}-data.sql");
+        @unlink("/tmp/{$this->localDB}-data.sql.gz");
+
         $this->command->info("Analyzing database structure...");
         $this->fetchTableCategories();
 
@@ -105,6 +109,107 @@ class SelectiveDatabaseExport
         $this->command->info("  - " . count($this->tableCategories['with_company_id']) . " with company_id");
         $this->command->info("  - " . count($this->tableCategories['with_ifrs_setting_id']) . " with ifrs_setting_id");
         $this->command->info("  - " . count($this->tableCategories['with_ifrs_settings_id']) . " with ifrs_settings_id");
+
+        // Hämta foreign key-relationer för att sortera tabeller
+        $this->fetchTableDependencies();
+    }
+
+    protected function fetchTableDependencies(): void
+    {
+        $this->command->info("Sorting tables by dependencies...");
+
+        // Explicit tier-ordning baserad på Eloquent model relations
+        $tiers = [
+            // Tier 0 - Root (cirkulära beroenden - kopiera först)
+            0 => ['companies', 'users'],
+
+            // Tier 1 - Beror på users ELLER companies
+            1 => [
+                'units', 'company_types', 'currencies', 'interest_rates', 'scb_indexes',
+                'plans', 'acl_permissions', 'acl_roles', 'tags', 'agents', 'applications',
+                'api_keys', 'product_categories', 'help_texts', 'languages', 'sign_templates',
+                'suppliers', 'report_templates', 'report_designers', 'currency_sets',
+                'currency_rates', 'currency_rate_pairs', 'folders', 'groups', 'taxes',
+                'price_lists', 'licenses', 'ifrs_settings', 'portfolios', 'kleer_clients',
+                'pe_agreements', 'onboarding_processes', 'campaign_rules', 'auctions', 'faqs',
+                'files', 'messages', 'stories', 'blogposts', 'bookmarks', 'reco_lists',
+                'reminders', 'chat_rooms', 'ifrs_business_areas', 'sdg_assessments', 'workflows',
+                'contract_nodes', 'contract_custom_fields', 'contract_views', 'dimensions',
+                'menus', 'form_entities', 'procurement_nodes', 'company_invoices', 'company_metas',
+                'company_s3_s', 'company_presentations', 'company_revenues', 'products', 'tenders',
+            ],
+
+            // Tier 2 - Beror på Tier 1
+            2 => [
+                'contracts', 'contract_bulks', 'documents', 'group_objects', 'tax_values',
+                'portfolio_versions', 'procurements', 'product_specification_documents',
+                'currency_rate_pair_values', 'scb_index_values', 'interest_rate_values',
+                'kleer_agreements', 'pe_invoices', 'report_designer_versions', 'onboarding_steps',
+                'campaigns', 'auctionevents', 'faq_tracks', 'chat_items', 'sdg_assessment_goals',
+                'agent_threads', 'application_users', 'plan_features', 'plan_subscriptions',
+                'user_metas', 'user_consents', 'ifrs_contract_categories', 'ifrs_cost_places',
+                'ifrs_currencies', 'ifrs_indexes', 'ifrs_interests', 'ifrs_reports',
+                'ifrs_setting_unit', 'finance_requests', 'backups', 'exports', 'imports',
+                'form_fields', 'procurement_subscriptions', 'product_category_subscriptions',
+                'reseller_settlements', 'filament_filter_sets', 'company_users', 'sign_receivers',
+            ],
+
+            // Tier 3 - Beror på Tier 2
+            3 => [
+                'contract_versions', 'contract_errors', 'contract_metas', 'contract_ocrs',
+                'contract_todos', 'contract_balances', 'contract_bulk_imports', 'contract_forecasts',
+                'document_metas', 'comments', 'signs', 'procurement_invites', 'procurement_responses',
+                'procurement_forms', 'agent_messages', 'plan_subscription_usage',
+                'ifrs_currency_values', 'ifrs_index_values', 'ifrs_interest_values',
+                'ifrs_report_generated', 'ifrs_report_unit', 'ifrs_report_ifrs_cost_place',
+                'finance_request_files', 'failed_import_rows', 'gdpr_people',
+            ],
+
+            // Tier 4 - Beror på Tier 3
+            4 => [
+                'sign_emails', 'procurement_response_forms', 'agent_message_attachments',
+                'agent_message_chunks', 'ifrs_report_generated_files', 'contract_version_report',
+                'report_generators',
+            ],
+
+            // Tier 5 - Pivot/junction-tabeller
+            5 => [
+                'company_type', 'company_price_list', 'company_contract_node', 'contract_product',
+                'contract_workflow', 'contract_view_user', 'campaign_contract', 'campaign_user',
+                'chat_room_user', 'group_user', 'dimension_ifrs_report', 'portfolio_product',
+                'pe_agreement_plan_subscription', 'company_invoice_plan_subscription',
+                'acl_model_has_roles', 'acl_model_has_permissions', 'acl_role_has_permissions',
+                'taggables', 'reseller_users', 'reseller_companies', 'campaign_unsubs',
+            ],
+
+            // Tier 6 - Tabeller utan belongsTo (polymorphic, no FK)
+            6 => [
+                'activity_log', 'action_events', 'accesses', 'ai_chunks', 'notifications',
+                'personal_access_tokens', 'external_objects', 'media', 'stibors',
+            ],
+        ];
+
+        // Skapa lookup för tier per tabell
+        $tableTier = [];
+        foreach ($tiers as $tier => $tables) {
+            foreach ($tables as $table) {
+                $tableTier[$table] = $tier;
+            }
+        }
+
+        // Sortera alla tabeller efter tier (okända tabeller hamnar sist)
+        $allTables = $this->tableCategories['all_tables'];
+        usort($allTables, function($a, $b) use ($tableTier) {
+            $tierA = $tableTier[$a] ?? 999;
+            $tierB = $tableTier[$b] ?? 999;
+            if ($tierA === $tierB) {
+                return strcmp($a, $b); // Alfabetiskt inom samma tier
+            }
+            return $tierA - $tierB;
+        });
+
+        $this->tableCategories['all_tables'] = $allTables;
+        $this->command->info("  - Sorted " . count($allTables) . " tables by tier dependencies");
     }
 
     protected function dumpSchema(): void
@@ -116,6 +221,7 @@ class SelectiveDatabaseExport
 
     protected function exportData(): void
     {
+        // Tabeller är redan sorterade efter FK-beroenden i fetchTableDependencies()
         $tables = $this->tableCategories['all_tables'];
         $totalTables = count($tables);
         $companyIdList = implode(',', $this->companyIds);
@@ -144,16 +250,36 @@ class SelectiveDatabaseExport
                 continue;
             }
 
-            // Använd \copy via heredoc - detta fungerar utan superuser
-            // Heredoc approach som fungerar
+            // Formatera kolumnnamn med quotes
+            $columnList = implode(', ', array_map(fn($col) => '"' . trim($col) . '"', explode(',', $columns)));
+
+            // Skriv COPY header
+            fwrite($handle, "-- Table: {$table}\n");
+            fwrite($handle, "COPY \"{$table}\" ({$columnList}) FROM stdin;\n");
+
+            // Använd heredoc och skriv direkt till fil (streama för att undvika minnesöverskridning)
             $exportCmd = "ssh {$this->host} -o \"StrictHostKeyChecking no\" 'sudo -i -u forge psql -q {$this->db} << ENDSQL
 \\copy ({$selectQuery}) TO STDOUT
 ENDSQL' 2>/dev/null";
 
-            $data = shell_exec($exportCmd);
+            // Kör kommandot och skriv output direkt till filen
+            $process = popen($exportCmd, 'r');
+            $hasData = false;
+            if ($process) {
+                while (($line = fgets($process)) !== false) {
+                    $hasData = true;
+                    fwrite($handle, $line);
+                }
+                pclose($process);
+            }
 
-            if ($data && trim($data) !== '') {
-                $this->writeTableData($handle, $table, $columns, $data);
+            // Avsluta COPY-blocket om vi hade data, annars ta bort header
+            if ($hasData) {
+                fwrite($handle, "\\.\n\n");
+            } else {
+                // Spola tillbaka och skriv över header om ingen data
+                // (vi hoppar över detta för enkelhet - tom COPY är OK)
+                fwrite($handle, "\\.\n\n");
             }
 
             $progressBar->advance();
@@ -210,37 +336,6 @@ ENDSQL' 2>/dev/null";
             }
         }
         return false;
-    }
-
-    protected function writeTableData($handle, string $table, string $columns, string $data): void
-    {
-        $lines = explode("\n", $data);
-        $hasData = false;
-
-        foreach ($lines as $line) {
-            if (trim($line) !== '') {
-                $hasData = true;
-                break;
-            }
-        }
-
-        if (!$hasData) {
-            return;
-        }
-
-        // Formatera kolumnnamn med quotes
-        $columnList = implode(', ', array_map(fn($col) => '"' . trim($col) . '"', explode(',', $columns)));
-
-        fwrite($handle, "-- Table: {$table}\n");
-        fwrite($handle, "COPY \"{$table}\" ({$columnList}) FROM stdin;\n");
-
-        foreach ($lines as $line) {
-            if (trim($line) !== '') {
-                fwrite($handle, $line . "\n");
-            }
-        }
-
-        fwrite($handle, "\\.\n\n");
     }
 
     protected function runRemoteQuery(string $query): string
