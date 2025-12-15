@@ -47,6 +47,7 @@ class SelectiveDatabaseExport
         'notifications',
         'contract_version_report',
         'contract_balances',
+        'scout_index',
     ];
 
     protected array $tableCategories = [
