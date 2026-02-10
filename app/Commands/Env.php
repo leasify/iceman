@@ -50,7 +50,7 @@ class Env extends Command
     {
         $result = "";
         if ($environment == "prod" || $environment == "production") {
-            $result = "forge@16.16.115.84";
+            $result = "forge@16.16.193.237";
         }
         if ($environment == "develop") {
             $result = "forge@13.51.90.196";
